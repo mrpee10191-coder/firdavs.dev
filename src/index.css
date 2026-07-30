@@ -1,0 +1,130 @@
+@import 'https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;1,400&display=swap';
+@import 'tailwindcss';
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html {
+  scroll-behavior: smooth;
+  overflow-x: hidden;
+}
+
+body {
+  background-color: #08080F;
+  color: #E8E8F0;
+  font-family: 'Outfit', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
+img, svg {
+  max-width: 100%;
+}
+
+/* Comfortable minimum tap target size on touch devices */
+@media (hover: none) and (pointer: coarse) {
+  button, a {
+    min-height: 36px;
+  }
+}
+
+::selection {
+  background: #00E5FF;
+  color: #08080F;
+}
+
+::-webkit-scrollbar { width: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #1E1E30; }
+::-webkit-scrollbar-thumb:hover { background: #00E5FF; }
+
+/* ─── Page loader ─────────────────────────────────────────────────────────── */
+
+.loader-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.4s ease;
+  opacity: 1;
+}
+
+.loader-overlay.loader-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.loader {
+  position: relative;
+  width: 120px;
+  height: 90px;
+  margin: 0 auto;
+}
+
+.loader:before {
+  content: "";
+  position: absolute;
+  bottom: 30px;
+  left: 50px;
+  height: 30px;
+  width: 30px;
+  border-radius: 50%;
+  background: var(--loader-accent, #00E5FF);
+  box-shadow: 0 0 16px 0 var(--loader-accent, #00E5FF);
+  animation: loading-bounce 0.5s ease-in-out infinite alternate;
+}
+
+.loader:after {
+  content: "";
+  position: absolute;
+  right: 0;
+  top: 0;
+  height: 7px;
+  width: 45px;
+  border-radius: 4px;
+  box-shadow: 0 5px 0 var(--loader-step, #E8E8F0), -35px 50px 0 var(--loader-step, #E8E8F0), -70px 95px 0 var(--loader-step, #E8E8F0);
+  animation: loading-step 1s ease-in-out infinite;
+}
+
+@keyframes loading-bounce {
+  0% {
+    transform: scale(1, 0.7);
+  }
+
+  40% {
+    transform: scale(0.8, 1.2);
+  }
+
+  60% {
+    transform: scale(1, 1);
+  }
+
+  100% {
+    bottom: 140px;
+  }
+}
+
+@keyframes loading-step {
+  0% {
+    box-shadow: 0 10px 0 rgba(0, 0, 0, 0),
+            0 10px 0 var(--loader-step, #E8E8F0),
+            -35px 50px 0 var(--loader-step, #E8E8F0),
+            -70px 90px 0 var(--loader-step, #E8E8F0);
+  }
+
+  100% {
+    box-shadow: 0 10px 0 var(--loader-step, #E8E8F0),
+            -35px 50px 0 var(--loader-step, #E8E8F0),
+            -70px 90px 0 var(--loader-step, #E8E8F0),
+            -70px 90px 0 rgba(0, 0, 0, 0);
+  }
+}
+
+/* Hide the loader entirely on phone-sized screens */
+@media (max-width: 640px) {
+  .loader-overlay {
+    display: none;
+  }
+}
