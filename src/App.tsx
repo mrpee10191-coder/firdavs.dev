@@ -1,11 +1,11 @@
-import { useState, useEffect, useRef, createContext, useContext } from 'react'
+import React, { useState, useEffect, useRef, createContext, useContext } from 'react'
 
 // ─── Theme & Language context ─────────────────────────────────────────────────
 
 type Theme = 'dark' | 'light'
 type Lang = 'en' | 'ru' | 'uz'
 
-const ThemeCtx = createContext<{ theme: Theme; toggle: () => void }>({ theme: 'dark', toggle: () => {} })
+const ThemeCtx = createContext<{ theme: Theme; toggle: (el?: HTMLElement) => void }>({ theme: 'dark', toggle: () => {} })
 const LangCtx = createContext<{ lang: Lang; setLang: (l: Lang) => void }>({ lang: 'en', setLang: () => {} })
 
 function useTheme() { return useContext(ThemeCtx) }
@@ -296,7 +296,7 @@ function DesktopNav({ active, c }: { active: string; c: ReturnType<typeof tokens
           </div>
 
           {/* Theme toggle */}
-          <button onClick={toggle}
+          <button onClick={e => toggle(e.currentTarget)}
             style={{ background: 'none', border: `1px solid ${c.border}`, cursor: 'pointer', color: c.muted, padding: '5px 8px', display: 'flex', alignItems: 'center', transition: 'border-color 0.2s, color 0.2s' }}
             onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = c.accent; (e.currentTarget as HTMLElement).style.color = c.accent }}
             onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = c.border; (e.currentTarget as HTMLElement).style.color = c.muted }}
@@ -319,7 +319,25 @@ function MobileLayout({ active, c, children }: { active: string; c: ReturnType<t
   const t = T[lang]
 
   const SIDEBAR_COLLAPSED = 52
-  const SIDEBAR_EXPANDED = 200
+  const SIDEBAR_MIN = 160
+  const SIDEBAR_MAX = 320
+  const [sidebarWidth, setSidebarWidth] = useState(200)
+  const [dragging, setDragging] = useState(false)
+
+  useEffect(() => {
+    if (!dragging) return
+    const onMove = (ev: MouseEvent) => {
+      const next = Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, ev.clientX))
+      setSidebarWidth(next)
+    }
+    const onUp = () => setDragging(false)
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+    return () => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+  }, [dragging])
 
   const scrollTo = (id: string) => {
     document.getElementById(id.toLowerCase())?.scrollIntoView({ behavior: 'smooth' })
@@ -342,10 +360,10 @@ function MobileLayout({ active, c, children }: { active: string; c: ReturnType<t
         onClick={() => { if (!open) setOpen(true) }}
         style={{
           position: 'fixed', top: 0, left: 0, bottom: 0, zIndex: 200,
-          width: open ? SIDEBAR_EXPANDED : SIDEBAR_COLLAPSED,
+          width: open ? sidebarWidth : SIDEBAR_COLLAPSED,
           backgroundColor: c.surface,
           borderRight: `1px solid ${c.border}`,
-          transition: 'width 0.28s cubic-bezier(0.4,0,0.2,1)',
+          transition: dragging ? 'none' : 'width 0.28s cubic-bezier(0.4,0,0.2,1)',
           overflow: 'hidden',
           display: 'flex', flexDirection: 'column',
           cursor: open ? 'default' : 'pointer',
@@ -404,7 +422,7 @@ function MobileLayout({ active, c, children }: { active: string; c: ReturnType<t
                   </button>
                 ))}
               </div>
-              <button onClick={e => { e.stopPropagation(); toggle() }}
+              <button onClick={e => { e.stopPropagation(); toggle(e.currentTarget) }}
                 style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: `1px solid ${c.border}`, color: c.muted, cursor: 'pointer', padding: '7px 10px', fontSize: 12, fontFamily: "'JetBrains Mono', monospace", transition: 'all 0.2s', letterSpacing: '0.04em' }}
               >
                 {theme === 'dark' ? icons.Sun : icons.Moon}
@@ -413,12 +431,21 @@ function MobileLayout({ active, c, children }: { active: string; c: ReturnType<t
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '12px 0' }}>
-              <button onClick={e => { e.stopPropagation(); toggle() }} style={{ background: 'none', border: 'none', color: c.muted, cursor: 'pointer', display: 'flex', padding: 4 }}>
+              <button onClick={e => { e.stopPropagation(); toggle(e.currentTarget) }} style={{ background: 'none', border: 'none', color: c.muted, cursor: 'pointer', display: 'flex', padding: 4 }}>
                 {theme === 'dark' ? icons.Sun : icons.Moon}
               </button>
             </div>
           )}
         </div>
+        {open && (
+          <div
+            onMouseDown={e => { e.stopPropagation(); setDragging(true) }}
+            style={{
+              position: 'absolute', top: 0, right: 0, bottom: 0, width: 6,
+              cursor: 'ew-resize', zIndex: 210,
+            }}
+          />
+        )}
       </aside>
 
       {/* Top bar */}
@@ -777,31 +804,44 @@ function ContactSection({ c }: { c: ReturnType<typeof tokens> }) {
   )
 }
 
-function Footer({ c }: { c: ReturnType<typeof tokens> }) {
+function Footer({ c, isMobile }: { c: ReturnType<typeof tokens>; isMobile: boolean }) {
   const { lang } = useLang()
   const t = T[lang]
+  const hhLink = React.createElement(
+    "a",
+    {
+      href: "https://tashkent.hh.uz/applicant/profile/me?hhtmFrom=resume_profile_front",
+      target: "_blank",
+      rel: "noopener noreferrer",
+      style: { fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: c.accent, textDecoration: "none", letterSpacing: "0.02em", fontWeight: 600, transition: "opacity 0.2s" },
+      onMouseEnter: (e) => { e.currentTarget.style.opacity = "0.75" },
+      onMouseLeave: (e) => { e.currentTarget.style.opacity = "1" },
+    },
+    isMobile ? "hh.uz →" : t.footerHH
+  )
+  const nameLabel = (
+    <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: c.muted }}>© 2026 Firdavs Shoxidov</span>
+  )
   return (
-    <footer style={{ borderTop: `1px solid ${c.border}`, padding: 'clamp(20px, 5vw, 32px)', backgroundColor: c.surface }}>
-      <div style={{ maxWidth: 1100, margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: c.muted }}>© 2026 Firdavs Shoxidov</span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
-          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: c.muted }}>{t.footerBuilt}</span>
-          <a
-            href="https://tashkent.hh.uz/applicant/profile/me?hhtmFrom=resume_profile_front"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: c.accent, textDecoration: 'none', letterSpacing: '0.02em', fontWeight: 600, transition: 'opacity 0.2s' }}
-            onMouseEnter={e => ((e.currentTarget as HTMLElement).style.opacity = '0.75')}
-            onMouseLeave={e => ((e.currentTarget as HTMLElement).style.opacity = '1')}
-          >
-            {t.footerHH}
-          </a>
-        </div>
+    <footer style={{ borderTop: '1px solid ' + c.border, padding: isMobile ? '18px 18px' : '24px 18px', backgroundColor: c.surface }}>
+      <div style={{ maxWidth: 1100, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+        {isMobile ? (
+          <>
+            {hhLink}
+            {nameLabel}
+          </>
+        ) : (
+          <>
+            {nameLabel}
+            <div style={{ display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap" }}>
+              {hhLink}
+            </div>
+          </>
+        )}
       </div>
     </footer>
   )
 }
-
 // ─── Root ─────────────────────────────────────────────────────────────────────
 
 const THEME_KEY = 'portfolio:theme'
@@ -872,7 +912,22 @@ function Portfolio() {
     return () => observer.disconnect()
   }, [])
 
-  const toggle = () => setTheme(t => t === 'dark' ? 'light' : 'dark')
+  const toggle = (el?: HTMLElement) => {
+    const rect = el ? el.getBoundingClientRect() : null
+    const x = rect ? rect.left + rect.width / 2 : window.innerWidth / 2
+    const y = rect ? rect.top + rect.height / 2 : 0
+    const r = Math.hypot(Math.max(x, window.innerWidth - x), Math.max(y, window.innerHeight - y))
+    document.documentElement.style.setProperty('--theme-x', `${x}px`)
+    document.documentElement.style.setProperty('--theme-y', `${y}px`)
+    document.documentElement.style.setProperty('--theme-r', `${r}px`)
+    const flip = () => setTheme(t => (t === 'dark' ? 'light' : 'dark'))
+    const anyDoc = document as unknown as { startViewTransition?: (cb: () => void) => void }
+    if (anyDoc.startViewTransition) {
+      anyDoc.startViewTransition(flip)
+    } else {
+      flip()
+    }
+  }
 
   const content = (
     <main style={{ backgroundColor: c.bg }}>
@@ -881,7 +936,7 @@ function Portfolio() {
       <ProjectsSection c={c} isMobile={isMobile} />
       <SkillsSection c={c} />
       <ContactSection c={c} />
-      <Footer c={c} />
+      <Footer c={c} isMobile={isMobile} />
     </main>
   )
 
