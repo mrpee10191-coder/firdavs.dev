@@ -211,7 +211,7 @@ function tokens(theme: Theme) {
   }
   return {
     bg: '#F5F5FA', surface: '#EAEAF2', border: '#D4D4E8',
-    fg: '#0A0A18', muted: '#8888AA', sub: '#6060808',
+    fg: '#0A0A18', muted: '#8888AA', sub: '#606080',
     accent: '#0055FF', accentBg: '#0055FF14',
   }
 }
@@ -323,6 +323,30 @@ function MobileLayout({ active, c, children }: { active: string; c: ReturnType<t
   const SIDEBAR_MAX = 320
   const [sidebarWidth, setSidebarWidth] = useState(200)
   const [dragging, setDragging] = useState(false)
+  const [liveWidth, setLiveWidth] = useState<number | null>(null)
+  const touchStartRef = useRef<{ x: number; startWidth: number } | null>(null)
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartRef.current = { x: e.touches[0].clientX, startWidth: open ? sidebarWidth : SIDEBAR_COLLAPSED }
+  }
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!touchStartRef.current) return
+    const dx = e.touches[0].clientX - touchStartRef.current.x
+    const next = Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_COLLAPSED, touchStartRef.current.startWidth + dx))
+    setLiveWidth(next)
+  }
+  const handleTouchEnd = () => {
+    if (liveWidth === null) { touchStartRef.current = null; return }
+    const openThreshold = (SIDEBAR_COLLAPSED + SIDEBAR_MIN) / 2
+    if (liveWidth > openThreshold) {
+      setSidebarWidth(Math.max(SIDEBAR_MIN, liveWidth))
+      setOpen(true)
+    } else {
+      setOpen(false)
+    }
+    setLiveWidth(null)
+    touchStartRef.current = null
+  }
 
   useEffect(() => {
     if (!dragging) return
@@ -347,23 +371,30 @@ function MobileLayout({ active, c, children }: { active: string; c: ReturnType<t
   return (
     <div style={{ display: 'flex', minHeight: '100vh' }}>
       {/* Backdrop: closes the sidebar when tapping outside of it */}
-      {open && (
-        <div
-          onClick={() => setOpen(false)}
-          style={{ position: 'fixed', inset: 0, zIndex: 190, backgroundColor: 'rgba(0,0,0,0.35)', transition: 'opacity 0.2s' }}
-          aria-hidden="true"
-        />
-      )}
+      <div
+        onClick={() => setOpen(false)}
+        style={{
+          position: 'fixed', inset: 0, zIndex: 190,
+          backgroundColor: 'rgba(0,0,0,0.35)',
+          opacity: open ? 1 : 0,
+          pointerEvents: open ? 'auto' : 'none',
+          transition: 'opacity 0.28s cubic-bezier(0.4,0,0.2,1)',
+        }}
+        aria-hidden={!open}
+      />
 
       {/* Sidebar */}
       <aside
         onClick={() => { if (!open) setOpen(true) }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
         style={{
           position: 'fixed', top: 0, left: 0, bottom: 0, zIndex: 200,
-          width: open ? sidebarWidth : SIDEBAR_COLLAPSED,
+          width: liveWidth ?? (open ? sidebarWidth : SIDEBAR_COLLAPSED),
           backgroundColor: c.surface,
           borderRight: `1px solid ${c.border}`,
-          transition: dragging ? 'none' : 'width 0.28s cubic-bezier(0.4,0,0.2,1)',
+          transition: (dragging || liveWidth !== null) ? 'none' : 'width 0.28s cubic-bezier(0.4,0,0.2,1)',
           overflow: 'hidden',
           display: 'flex', flexDirection: 'column',
           cursor: open ? 'default' : 'pointer',
@@ -486,6 +517,137 @@ function Tag({ label, c }: { label: string; c: ReturnType<typeof tokens> }) {
   )
 }
 
+// ─── Hero shapes loader ────────────────────────────────────────────────────────
+// Desktop: circle + triangle + rect · Tablet: circle + triangle · Mobile: circle only
+
+function ShapesLoaderGroup({ c }: { c: ReturnType<typeof tokens> }) {
+  const vars = { '--shape-path': c.sub, '--shape-dot': c.accent } as React.CSSProperties
+  return (
+    <>
+      <style>{`
+        .shapes-loader-group {
+          --unit: clamp(26px, 6.2vw, 84px);
+          display: flex;
+          align-items: center;
+          gap: clamp(12px, 2.8vw, 28px);
+          flex-shrink: 0;
+        }
+        .shape-loader {
+          --duration: 3s;
+          --size: var(--unit);
+          width: var(--size);
+          height: var(--size);
+          position: relative;
+          flex-shrink: 0;
+        }
+        .shape-loader:before {
+          content: "";
+          width: calc(var(--size) * 0.22);
+          height: calc(var(--size) * 0.22);
+          border-radius: 50%;
+          position: absolute;
+          display: block;
+          background: var(--shape-dot);
+          top: calc(var(--size) * 0.8409);
+          left: calc(var(--size) * 0.4318);
+          transform: translate(calc(var(--size) * -0.4091), calc(var(--size) * -0.4091));
+          animation: shapesDotRect var(--duration) cubic-bezier(0.785, 0.135, 0.15, 0.86) infinite;
+        }
+        .shape-loader svg {
+          display: block;
+          width: 100%;
+          height: 100%;
+          overflow: visible;
+        }
+        .shape-loader svg rect,
+        .shape-loader svg polygon,
+        .shape-loader svg circle {
+          fill: none;
+          stroke: var(--shape-path);
+          stroke-width: 14px;
+          stroke-linejoin: round;
+          stroke-linecap: round;
+        }
+        .shape-loader svg polygon {
+          stroke-dasharray: 145 76 145 76;
+          stroke-dashoffset: 0;
+          animation: shapesPathTriangle var(--duration) cubic-bezier(0.785, 0.135, 0.15, 0.86) infinite;
+        }
+        .shape-loader svg rect {
+          stroke-dasharray: 192 64 192 64;
+          stroke-dashoffset: 0;
+          animation: shapesPathRect var(--duration) cubic-bezier(0.785, 0.135, 0.15, 0.86) infinite;
+        }
+        .shape-loader svg circle {
+          stroke-dasharray: 150 50 150 50;
+          stroke-dashoffset: 75;
+          animation: shapesPathCircle var(--duration) cubic-bezier(0.785, 0.135, 0.15, 0.86) infinite;
+        }
+        .shape-loader.triangle {
+          --tsize: calc(var(--size) * 1.0909);
+          width: var(--tsize);
+        }
+        .shape-loader.triangle:before {
+          left: calc(var(--tsize) * 0.4375);
+          transform: translate(calc(var(--tsize) * -0.2083), calc(var(--size) * -0.4091));
+          animation: shapesDotTriangle var(--duration) cubic-bezier(0.785, 0.135, 0.15, 0.86) infinite;
+        }
+        @keyframes shapesPathTriangle {
+          33% { stroke-dashoffset: 74; }
+          66% { stroke-dashoffset: 147; }
+          100% { stroke-dashoffset: 221; }
+        }
+        @keyframes shapesDotTriangle {
+          33% { transform: translate(0, 0); }
+          66% { transform: translate(calc(var(--tsize) * 0.2083), calc(var(--size) * -0.4091)); }
+          100% { transform: translate(calc(var(--tsize) * -0.2083), calc(var(--size) * -0.4091)); }
+        }
+        @keyframes shapesPathRect {
+          25% { stroke-dashoffset: 64; }
+          50% { stroke-dashoffset: 128; }
+          75% { stroke-dashoffset: 192; }
+          100% { stroke-dashoffset: 256; }
+        }
+        @keyframes shapesDotRect {
+          25% { transform: translate(0, 0); }
+          50% { transform: translate(calc(var(--size) * 0.4091), calc(var(--size) * -0.4091)); }
+          75% { transform: translate(0, calc(var(--size) * -0.8182)); }
+          100% { transform: translate(calc(var(--size) * -0.4091), calc(var(--size) * -0.4091)); }
+        }
+        @keyframes shapesPathCircle {
+          25% { stroke-dashoffset: 125; }
+          50% { stroke-dashoffset: 175; }
+          75% { stroke-dashoffset: 225; }
+          100% { stroke-dashoffset: 275; }
+        }
+        @media (max-width: 1023px) {
+          .shapes-loader-group > *:nth-child(3) { display: none; }
+        }
+        @media (max-width: 639px) {
+          .shapes-loader-group > *:nth-child(2) { display: none; }
+        }
+      `}</style>
+      <div className="shapes-loader-group" style={vars} aria-hidden="true">
+        <div className="shape-loader">
+          <svg viewBox="0 0 80 80">
+            <circle r="32" cy="40" cx="40"></circle>
+          </svg>
+        </div>
+        <div className="shape-loader triangle">
+          <svg viewBox="0 0 86 80">
+            <polygon points="43 8 79 72 7 72"></polygon>
+          </svg>
+        </div>
+        <div className="shape-loader">
+          <svg viewBox="0 0 80 80">
+            <rect height="64" width="64" y="8" x="8"></rect>
+          </svg>
+        </div>
+      </div>
+    </>
+  )
+}
+
 // ─── Sections ─────────────────────────────────────────────────────────────────
 
 function Hero({ c }: { c: ReturnType<typeof tokens> }) {
@@ -502,10 +664,15 @@ function Hero({ c }: { c: ReturnType<typeof tokens> }) {
           {t.available}
         </div>
 
-        <h1 style={{ fontFamily: "'Outfit', system-ui, sans-serif", fontWeight: 800, fontSize: 'clamp(40px, 13vw, 112px)', lineHeight: 0.95, letterSpacing: '-0.03em', color: c.fg, margin: 0, marginBottom: 8, wordBreak: 'break-word' }}>
-          Firdavs<br />
-          <span style={{ color: c.accent }}>Shoxidov</span>
-        </h1>
+        <div style={{ position: 'relative', width: '100%' }}>
+          <h1 style={{ fontFamily: "'Outfit', system-ui, sans-serif", fontWeight: 800, fontSize: 'clamp(36px, 12vw, 112px)', lineHeight: 0.95, letterSpacing: '-0.03em', color: c.fg, margin: 0, marginBottom: 8, wordBreak: 'break-word' }}>
+            Firdavs<br />
+            <span style={{ color: c.accent }}>Shoxidov</span>
+          </h1>
+          <div style={{ position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)' }}>
+            <ShapesLoaderGroup c={c} />
+          </div>
+        </div>
 
         <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13, color: c.muted, marginTop: 24, marginBottom: 40, letterSpacing: '0.02em' }}>
           {t.role}
